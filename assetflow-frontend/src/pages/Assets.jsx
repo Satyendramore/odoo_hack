@@ -180,7 +180,8 @@ export default function Assets() {
       const params = {};
       if (statusFilter) params.status = statusFilter;
       const res = await api.get('/assets', { params });
-      setAssets(res.data);
+      // Backend returns a Page object; extract the content array
+      setAssets(res.data.content ?? res.data);
     } catch (err) { setError(err.response?.data?.message || err.message); }
   }
 
