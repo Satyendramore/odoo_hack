@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import api from '../api.js';
 
 const STATUS_BADGE = {
-  Upcoming: 'bg-info text-dark',
-  Ongoing: 'bg-success',
-  Completed: 'bg-secondary',
-  Cancelled: 'bg-danger',
+  UPCOMING: 'bg-info text-dark',
+  ONGOING: 'bg-success',
+  COMPLETED: 'bg-secondary',
+  CANCELLED: 'bg-danger',
 };
 
 function hasOverlap(newStart, newEnd, bookings) {

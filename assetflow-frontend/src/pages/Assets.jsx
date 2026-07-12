@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api.js';
 
-const STATUS_OPTIONS = ['Available', 'Allocated', 'Reserved', 'Under Maintenance', 'Lost', 'Retired', 'Disposed'];
+const STATUS_OPTIONS = ['AVAILABLE', 'ALLOCATED', 'RESERVED', 'UNDER_MAINTENANCE', 'LOST', 'RETIRED', 'DISPOSED'];
 const STATUS_BADGE = {
-  Available: 'bg-success',
-  Allocated: 'bg-primary',
-  Reserved: 'bg-warning text-dark',
-  'Under Maintenance': 'bg-info text-dark',
-  Lost: 'bg-danger',
-  Retired: 'bg-secondary',
-  Disposed: 'bg-dark',
+  AVAILABLE: 'bg-success',
+  ALLOCATED: 'bg-primary',
+  RESERVED: 'bg-warning text-dark',
+  UNDER_MAINTENANCE: 'bg-info text-dark',
+  LOST: 'bg-danger',
+  RETIRED: 'bg-secondary',
+  DISPOSED: 'bg-dark',
 };
 
 // ─── Registration Form ────────────────────────────────────────────────────────

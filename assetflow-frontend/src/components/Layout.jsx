@@ -5,11 +5,11 @@ import Topbar from './Topbar.jsx';
 
 export default function Layout() {
   return (
-    <div className="d-flex" style={{ minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar />
-      <div className="d-flex flex-column flex-grow-1">
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
         <Topbar />
-        <main className="flex-grow-1 p-4 af-main">
+        <main className="af-main">
           <Outlet />
         </main>
       </div>
