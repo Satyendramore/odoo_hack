@@ -1,6 +1,7 @@
 package com.assetflow.exception;
 
 import com.assetflow.dto.ErrorResponse;
+import com.assetflow.dto.ErrorResponseWithMetadata;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -86,6 +87,48 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidStatusTransitionException.class)
     public ResponseEntity<ErrorResponse> handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AssetAlreadyAllocatedException.class)
+    public ResponseEntity<ErrorResponseWithMetadata> handleAssetAlreadyAllocated(AssetAlreadyAllocatedException ex) {
+        ErrorResponseWithMetadata response = new ErrorResponseWithMetadata(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                ex.getCurrentHolder(),
+                "TRANSFER_REQUEST"
+        );
+        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(AllocationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAllocationNotFound(AllocationNotFoundException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(TransferRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTransferRequestNotFound(TransferRequestNotFoundException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(InvalidAllocationStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAllocationState(InvalidAllocationStateException ex) {
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
