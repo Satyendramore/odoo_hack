@@ -1,5 +1,6 @@
 package com.assetflow.exception;
 
+import com.assetflow.dto.BookingOverlapErrorResponse;
 import com.assetflow.dto.ErrorResponse;
 import com.assetflow.dto.ErrorResponseWithMetadata;
 import org.springframework.http.HttpStatus;
@@ -129,6 +130,48 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidAllocationStateException.class)
     public ResponseEntity<ErrorResponse> handleInvalidAllocationState(InvalidAllocationStateException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(BookingOverlapException.class)
+    public ResponseEntity<BookingOverlapErrorResponse> handleBookingOverlap(BookingOverlapException ex) {
+        BookingOverlapErrorResponse response = new BookingOverlapErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                ex.getConflictingStart(),
+                ex.getConflictingEnd()
+        );
+        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(AssetNotBookableException.class)
+    public ResponseEntity<ErrorResponse> handleAssetNotBookable(AssetNotBookableException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(BookingNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleBookingNotFound(BookingNotFoundException ex) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(InvalidBookingStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidBookingState(InvalidBookingStateException ex) {
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),

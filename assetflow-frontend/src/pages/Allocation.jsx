@@ -18,11 +18,12 @@ export default function Allocation() {
   async function loadAll() {
     try {
       const [assetsRes, empRes, allocRes] = await Promise.all([
-        api.get('/assets', { params: { status: 'Available' } }),
+        api.get('/assets', { params: { status: 'AVAILABLE' } }),
         api.get('/admin/employees'),
         api.get('/allocations'),
       ]);
-      setAvailableAssets(assetsRes.data);
+      // /assets returns a paginated Page object
+      setAvailableAssets(assetsRes.data.content ?? assetsRes.data);
       setEmployees(empRes.data);
       setAllocations(allocRes.data);
     } catch (err) { setError(err.response?.data?.message || err.message); }
@@ -56,9 +57,12 @@ export default function Allocation() {
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || err.message || '';
-      const allocationId = err.response?.data?.allocationId || null;
-      if (status === 409 || (status === 400 && msg.toLowerCase().includes('currently held by'))) {
-        setConflictMsg(msg); setConflictAllocationId(allocationId);
+      if (status === 409 || status === 400) {
+        // Try to extract allocation ID from error message: "...allocation ID: <uuid>)"
+        const match = msg.match(/allocation ID:\s*([\w-]+)/i);
+        const allocationId = match ? match[1] : null;
+        setConflictMsg(msg);
+        setConflictAllocationId(allocationId);
       } else { setError(msg || 'Allocation failed.'); }
     } finally { setLoading(false); }
   }
