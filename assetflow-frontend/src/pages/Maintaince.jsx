@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import { assetsAPI } from '../api/assets.js';
+import apiClient from '../api/client.js';
 import { useAuth } from '../AuthContext.jsx';
 
 const COLUMNS = ['Pending', 'Approved', 'In Progress', 'Resolved', 'Rejected'];
@@ -13,9 +14,10 @@ const COL_BADGE = {
 };
 
 const PRIORITY_BADGE = {
-  Low: 'bg-secondary',
-  Medium: 'bg-warning text-dark',
-  High: 'bg-danger',
+  LOW: 'bg-secondary',
+  MEDIUM: 'bg-warning text-dark',
+  HIGH: 'bg-danger',
+  CRITICAL: 'bg-danger',
 };
 
 export default function Maintaince() {
@@ -24,7 +26,7 @@ export default function Maintaince() {
 
   const [assets, setAssets] = useState([]);
   const [requests, setRequests] = useState([]);
-  const [form, setForm] = useState({ assetId: '', issueDescription: '', priority: 'Medium' });
+  const [form, setForm] = useState({ assetId: '', issueDescription: '', priority: 'MEDIUM' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -32,10 +34,13 @@ export default function Maintaince() {
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'table'
 
   async function loadAssets() {
-    try { const r = await api.get('/assets'); setAssets(r.data.content ?? r.data); } catch { /* non-critical */ }
+    try { const r = await assetsAPI.getAssets(); setAssets(r.data.content ?? r.data); } catch { /* non-critical */ }
   }
   async function loadRequests() {
-    try { const r = await api.get('/maintenance'); setRequests(r.data); }
+    try { 
+      const r = await apiClient.get('/maintenance');
+      setRequests(r.data || []);
+    }
     catch (err) { setError(err.response?.data?.message || err.message); }
   }
   useEffect(() => { loadAssets(); loadRequests(); }, []);
@@ -48,8 +53,12 @@ export default function Maintaince() {
     if (Object.keys(errors).length) { setFieldErrors(errors); return; }
     setFieldErrors({}); setLoading(true);
     try {
-      await api.post('/maintenance', form);
-      setForm({ assetId: '', issueDescription: '', priority: 'Medium' });
+      await assetsAPI.raiseMaintenance({
+        assetId: form.assetId,
+        issueDescription: form.issueDescription,
+        priority: form.priority,
+      });
+      setForm({ assetId: '', issueDescription: '', priority: 'MEDIUM' });
       setSuccess('Maintenance request raised.'); loadRequests();
     } catch (err) { setError(err.response?.data?.message || err.message); }
     finally { setLoading(false); }
@@ -58,7 +67,9 @@ export default function Maintaince() {
   async function handleAction(id, action) {
     setError(''); setSuccess('');
     try {
-      await api.patch(`/maintenance/${id}/${action}`);
+      if (action === 'approve') await assetsAPI.approveMaintenance(id, {});
+      else if (action === 'reject') await assetsAPI.rejectMaintenance(id, {});
+      else if (action === 'resolve') await assetsAPI.resolveMaintenance(id, {});
       setSuccess(`Request ${action}d.`); loadRequests();
     } catch (err) { setError(err.response?.data?.message || err.message); }
   }
@@ -111,7 +122,7 @@ export default function Maintaince() {
             <div className="col-md-2">
               <label className="form-label form-label-sm">Priority</label>
               <select className="form-select form-select-sm" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-                <option>Low</option><option>Medium</option><option>High</option>
+                <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
               </select>
             </div>
             <div className="col-md-2 d-flex align-items-end">

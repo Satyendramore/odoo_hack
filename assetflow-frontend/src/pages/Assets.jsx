@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import { assetsAPI } from '../api/assets.js';
+import apiClient from '../api/client.js';
+import { useAuth } from '../AuthContext.jsx';
 
 const STATUS_OPTIONS = ['AVAILABLE', 'ALLOCATED', 'RESERVED', 'UNDER_MAINTENANCE', 'LOST', 'RETIRED', 'DISPOSED'];
 const STATUS_BADGE = {
@@ -39,7 +41,7 @@ function RegistrationForm({ categories, onCreated, onCancel }) {
     if (Object.keys(errors).length) { setFieldErrors(errors); return; }
     setFieldErrors({}); setLoading(true);
     try {
-      await api.post('/assets', { ...form, acquisitionCost: Number(form.acquisitionCost) });
+      await assetsAPI.createAsset({ ...form, acquisitionCost: Number(form.acquisitionCost) });
       onCreated('Asset registered successfully.');
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -114,7 +116,7 @@ function AssetModal({ assetId, onClose }) {
 
   useEffect(() => {
     if (!assetId) return;
-    api.get(`/assets/${assetId}`)
+    assetsAPI.getAssetById(assetId)
       .then(res => setAsset(res.data))
       .catch(err => setError(err.response?.data?.message || err.message));
   }, [assetId]);
@@ -165,6 +167,9 @@ function AssetModal({ assetId, onClose }) {
 // ─── Assets Page ──────────────────────────────────────────────────────────────
 
 export default function Assets() {
+  const { user } = useAuth();
+  const canRegister = user?.role === 'ADMIN' || user?.role === 'ASSET_MANAGER';
+
   const [assets, setAssets] = useState([]);
   const [categories, setCategories] = useState(null);
   const [search, setSearch] = useState('');
@@ -179,14 +184,14 @@ export default function Assets() {
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      const res = await api.get('/assets', { params });
+      const res = await assetsAPI.getAssets(params);
       // Backend returns a Page object; extract the content array
       setAssets(res.data.content ?? res.data);
     } catch (err) { setError(err.response?.data?.message || err.message); }
   }
 
   async function loadCategories() {
-    try { const res = await api.get('/admin/categories'); setCategories(res.data); }
+    try { const res = await assetsAPI.getCategories(); setCategories(res.data); }
     catch { setCategories([]); }
   }
 
@@ -204,15 +209,24 @@ export default function Assets() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="fw-semibold mb-0" style={{ color: 'var(--text-primary)' }}>Asset Registry &amp; Directory</h5>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(f => !f)}>
-          + Register asset
-        </button>
+        {canRegister && (
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(f => !f)}>
+            + Register asset
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-danger alert-dismissible py-2 small"><span>{error}</span><button className="btn-close btn-sm" onClick={() => setError('')} /></div>}
       {success && <div className="alert alert-success alert-dismissible py-2 small"><span>{success}</span><button className="btn-close btn-sm" onClick={() => setSuccess('')} /></div>}
 
-      {showForm && (
+      {!canRegister && showForm && (
+        <div className="alert alert-warning alert-dismissible mb-3 small">
+          <strong>Not authorized:</strong> Only Asset Managers and Admins can register new assets.
+          <button className="btn-close btn-sm" onClick={() => setShowForm(false)} />
+        </div>
+      )}
+
+      {showForm && canRegister && (
         <RegistrationForm
           categories={categories}
           onCreated={msg => { setSuccess(msg); setShowForm(false); loadAssets(); }}

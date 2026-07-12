@@ -75,6 +75,7 @@ public class AssetService {
         // Create and persist the asset
         Asset asset = Asset.builder()
                 .assetTag(assetTag)
+                .name(request.name())
                 .category(category)
                 .serialNumber(request.serialNumber())
                 .acquisitionDate(request.acquisitionDate())
@@ -187,6 +188,7 @@ public class AssetService {
         return new AssetResponse(
                 asset.getId(),
                 asset.getAssetTag(),
+                asset.getName(),
                 asset.getCategory().getName(),
                 asset.getCategory().getId(),
                 asset.getSerialNumber(),

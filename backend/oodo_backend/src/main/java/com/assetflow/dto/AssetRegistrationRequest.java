@@ -6,6 +6,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record AssetRegistrationRequest(
+        @NotBlank(message = "Name cannot be blank")
+        String name,
+
         @NotNull(message = "Category ID cannot be null")
         UUID categoryId,
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import apiClient from '../api/client.js';
 
 export default function Reports() {
   const [stats, setStats] = useState(null);
@@ -7,7 +7,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/reports/summary')
+    apiClient.get('/reports/summary')
       .then(res => setStats(res.data))
       .catch(() => setStats(null))
       .finally(() => setLoading(false));
@@ -47,7 +47,7 @@ export default function Reports() {
         </h5>
         <button
           className="btn btn-primary btn-sm"
-          onClick={() => api.get('/reports/export').catch(() => alert('Export not yet available.'))}
+          onClick={() => apiClient.get('/reports/export').catch(() => alert('Export not yet available.'))}
         >
           Export report
         </button>

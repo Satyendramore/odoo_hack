@@ -9,6 +9,7 @@ import java.util.UUID;
 public record AssetResponse(
         UUID id,
         String assetTag,
+        String name,
         String categoryName,
         UUID categoryId,
         String serialNumber,

@@ -30,6 +30,9 @@ public class Asset {
     @Column(nullable = false, unique = true, length = 20)
     private String assetTag;
 
+    @Column(nullable = false, length = 255)
+    private String name;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private AssetCategory category;

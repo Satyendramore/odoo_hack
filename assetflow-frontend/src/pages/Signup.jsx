@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api.js';
+import { authAPI } from '../api/auth';
 
 export default function Signup() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
@@ -32,11 +32,15 @@ export default function Signup() {
     setFieldErrors({});
     setLoading(true);
     try {
-      await api.post('/auth/signup', { name: form.name, email: form.email, password: form.password });
+      await authAPI.signup({ name: form.name, email: form.email, password: form.password });
       sessionStorage.setItem('signupSuccess', 'Account created successfully. Please sign in.');
       navigate('/login');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Signup failed. Please try again.');
+      if (err.response?.data?.errors) {
+        setFieldErrors(err.response.data.errors);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Signup failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

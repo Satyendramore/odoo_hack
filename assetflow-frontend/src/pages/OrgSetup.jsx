@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import { assetsAPI } from '../api/assets.js';
+import { adminAPI } from '../api/admin.js';
+import { useAuth } from '../AuthContext.jsx';
 
 // ─── Departments Tab ─────────────────────────────────────────────────────────
 
@@ -14,11 +16,11 @@ function DepartmentsTab() {
   const [editForm, setEditForm] = useState({});
 
   async function loadDepartments() {
-    try { const r = await api.get('/admin/departments'); setDepartments(r.data); }
+    try { const r = await adminAPI.getDepartments(); setDepartments(r.data); }
     catch (err) { setError(err.response?.data?.message || err.message); }
   }
   async function loadEmployees() {
-    try { const r = await api.get('/admin/employees'); setEmployees(r.data); }
+    try { const r = await adminAPI.getEmployees(); setEmployees(r.data); }
     catch { /* non-critical */ }
   }
   useEffect(() => { loadDepartments(); loadEmployees(); }, []);
@@ -28,7 +30,7 @@ function DepartmentsTab() {
     if (!form.name.trim()) { setFieldErrors({ name: 'Name is required.' }); return; }
     setFieldErrors({});
     try {
-      await api.post('/admin/departments', {
+      await adminAPI.createDepartment({
         name: form.name,
         headId: form.head || null,
         parentDepartmentId: form.parentDepartment || null,
@@ -41,7 +43,7 @@ function DepartmentsTab() {
   async function handleSaveEdit(id) {
     setError(''); setSuccess('');
     try {
-      await api.put(`/admin/departments/${id}`, {
+      await adminAPI.updateDepartment(id, {
         name: editForm.name,
         headId: editForm.head || null,
         parentDepartmentId: editForm.parentDepartment || null,
@@ -151,7 +153,7 @@ function CategoriesTab() {
   const [success, setSuccess] = useState('');
 
   async function loadCategories() {
-    try { const r = await api.get('/admin/categories'); setCategories(r.data); }
+    try { const r = await assetsAPI.getCategories(); setCategories(r.data); }
     catch (err) { setError(err.response?.data?.message || err.message); }
   }
   useEffect(() => { loadCategories(); }, []);
@@ -161,7 +163,7 @@ function CategoriesTab() {
     if (!form.name.trim()) { setFieldErrors({ name: 'Name is required.' }); return; }
     setFieldErrors({});
     try {
-      await api.post('/admin/categories', form);
+      await assetsAPI.createCategory(form);
       setForm({ name: '', customFields: '' }); setSuccess('Category created.'); loadCategories();
     } catch (err) { setError(err.response?.data?.message || err.message); }
   }
@@ -207,7 +209,7 @@ function EmployeesTab() {
   const [success, setSuccess] = useState('');
 
   async function loadEmployees() {
-    try { const r = await api.get('/admin/employees'); setEmployees(r.data); }
+    try { const r = await adminAPI.getEmployees(); setEmployees(r.data); }
     catch (err) { setError(err.response?.data?.message || err.message); }
   }
   useEffect(() => { loadEmployees(); }, []);
@@ -215,7 +217,7 @@ function EmployeesTab() {
   async function promoteRole(id, role) {
     setError(''); setSuccess('');
     try {
-      await api.patch(`/admin/employees/${id}/role`, { role });
+      await adminAPI.promoteEmployee(id, role);
       setSuccess(`Role updated to ${role.replace('_', ' ')}.`); loadEmployees();
     } catch (err) { setError(err.response?.data?.message || err.message); }
   }
@@ -257,6 +259,9 @@ function EmployeesTab() {
 // ─── OrgSetup Page ───────────────────────────────────────────────────────────
 
 export default function OrgSetup() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const [activeTab, setActiveTab] = useState('departments');
 
   const tabs = [
@@ -264,6 +269,20 @@ export default function OrgSetup() {
     { key: 'categories', label: 'Categories' },
     { key: 'employees', label: 'Employees' },
   ];
+
+  if (!isAdmin) {
+    return (
+      <div>
+        <div className="d-flex align-items-center justify-content-between mb-3">
+          <h5 className="fw-semibold mb-0" style={{ color: 'var(--text-primary)' }}>Organisation Setup</h5>
+        </div>
+        <div className="alert alert-warning" role="alert">
+          <h6 className="alert-heading fw-semibold">Access Restricted</h6>
+          <p className="mb-0">Only administrators can access organization setup. Please contact your admin if you need to manage departments, categories, or employee roles.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

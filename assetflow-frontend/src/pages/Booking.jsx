@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import { assetsAPI } from '../api/assets';
 
 const STATUS_BADGE = {
   UPCOMING: 'bg-info text-dark',
@@ -10,9 +10,9 @@ const STATUS_BADGE = {
 
 function hasOverlap(newStart, newEnd, bookings) {
   return bookings.some(b => {
-    if (b.status === 'Cancelled' || b.status === 'Completed') return false;
-    const s = new Date(b.startDatetime || b.startTime || b.start);
-    const e = new Date(b.endDatetime || b.endTime || b.end);
+    if (b.status === 'CANCELLED' || b.status === 'COMPLETED') return false;
+    const s = new Date(b.startTime || b.startDatetime || b.start);
+    const e = new Date(b.endTime || b.endDatetime || b.end);
     return newStart < e && newEnd > s;
   });
 }
@@ -28,30 +28,52 @@ export default function Booking() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(true);
 
+  // Load bookable assets
   useEffect(() => {
-    api.get('/assets', { params: { bookable: true } })
-      .then(res => setBookableAssets(res.data.content ?? res.data))
-      .catch(err => setError(err.response?.data?.message || err.message));
+    async function loadAssets() {
+      try {
+        const res = await assetsAPI.getAssets();
+        // Backend returns paginated { content: [], totalElements, etc. }
+        const assets = res.data.content ?? res.data;
+        // Filter for bookable assets
+        const bookable = (Array.isArray(assets) ? assets : []).filter(a => a.isBookable);
+        setBookableAssets(bookable);
+      } catch (err) {
+        console.error('Failed to load assets:', err);
+        setError('Failed to load bookable resources');
+      } finally {
+        setLoadingAssets(false);
+      }
+    }
+    loadAssets();
   }, []);
 
+  // Load bookings for selected asset
   useEffect(() => {
     if (!selectedAssetId) { setBookings([]); setCachedBookings([]); return; }
-    api.get(`/bookings/asset/${selectedAssetId}`)
-      .then(res => { setBookings(res.data); setCachedBookings(res.data); })
-      .catch(err => setError(err.response?.data?.message || err.message));
+    loadBookings();
   }, [selectedAssetId]);
 
   async function loadBookings() {
     if (!selectedAssetId) return;
     try {
-      const res = await api.get(`/bookings/asset/${selectedAssetId}`);
-      setBookings(res.data); setCachedBookings(res.data);
-    } catch (err) { setError(err.response?.data?.message || err.message); }
+      const res = await assetsAPI.getBookings(selectedAssetId);
+      setBookings(res.data || []);
+      setCachedBookings(res.data || []);
+    } catch (err) {
+      console.error('Failed to load bookings:', err);
+      setError(err.response?.data?.message || 'Failed to load bookings');
+    }
   }
 
   async function handleBook(e) {
-    e.preventDefault(); setError(''); setSuccess(''); setOverlapWarning('');
+    e.preventDefault(); 
+    setError(''); 
+    setSuccess(''); 
+    setOverlapWarning('');
+    
     const errors = {};
     if (!selectedAssetId) errors.asset = 'Select a resource.';
     if (!form.startDatetime) errors.startDatetime = 'Start time required.';
@@ -64,28 +86,43 @@ export default function Booking() {
     const newStart = new Date(form.startDatetime);
     const newEnd = new Date(form.endDatetime);
     if (hasOverlap(newStart, newEnd, cachedBookings)) {
-      setOverlapWarning('Overlap detected with an existing booking. Choose a different time window.'); return;
+      setOverlapWarning('Overlap detected with an existing booking. Choose a different time window.'); 
+      return;
     }
 
     setLoading(true);
     try {
-      await api.post('/bookings', {
+      await assetsAPI.createBooking({
         assetId: selectedAssetId,
-        startDatetime: new Date(form.startDatetime).toISOString(),
-        endDatetime: new Date(form.endDatetime).toISOString(),
+        startTime: new Date(form.startDatetime).toISOString(),
+        endTime: new Date(form.endDatetime).toISOString(),
       });
       setForm({ startDatetime: '', endDatetime: '' });
-      setSuccess('Booking created successfully.'); loadBookings();
-    } catch (err) { setError(err.response?.data?.message || err.message || 'Booking failed.'); }
-    finally { setLoading(false); }
+      setSuccess('Booking created successfully.'); 
+      await loadBookings();
+    } catch (err) {
+      if (err.response?.status === 409) {
+        // Handle booking overlap with conflicting times
+        const { conflictingStart, conflictingEnd } = err.response.data;
+        setError(`Booking conflict: slot already booked from ${conflictingStart} to ${conflictingEnd}`);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Booking failed.');
+      }
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   async function handleCancel(bookingId) {
-    setError(''); setSuccess('');
+    setError(''); 
+    setSuccess('');
     try {
-      await api.patch(`/bookings/${bookingId}/cancel`);
-      setSuccess('Booking cancelled.'); loadBookings();
-    } catch (err) { setError(err.response?.data?.message || err.message); }
+      await assetsAPI.cancelBooking(bookingId);
+      setSuccess('Booking cancelled.'); 
+      await loadBookings();
+    } catch (err) { 
+      setError(err.response?.data?.message || err.message); 
+    }
   }
 
   const selectedAsset = bookableAssets.find(a => String(a.id) === String(selectedAssetId));
@@ -101,7 +138,7 @@ export default function Booking() {
         {/* Overlap warning */}
         {overlapWarning && (
           <div className="alert alert-warning alert-dismissible py-2 small">
-            <strong>Requested 10:30–11:00 — slot is unavailable:</strong> {overlapWarning}
+            <strong>Slot unavailable:</strong> {overlapWarning}
             <button className="btn-close btn-sm" onClick={() => setOverlapWarning('')} />
           </div>
         )}
@@ -114,9 +151,12 @@ export default function Booking() {
                 className={`form-select form-select-sm ${fieldErrors.asset ? 'is-invalid' : ''}`}
                 value={selectedAssetId}
                 onChange={e => { setSelectedAssetId(e.target.value); setOverlapWarning(''); }}
+                disabled={loadingAssets}
               >
-                <option value="">— Select Resource —</option>
-                {bookableAssets.map(a => <option key={a.id} value={a.id}>{a.assetTag} — {a.name}</option>)}
+                <option value="">{loadingAssets ? 'Loading...' : '— Select Resource —'}</option>
+                {bookableAssets.map(a => (
+                  <option key={a.id} value={a.id}>{a.assetTag} — {a.categoryName || 'Asset'}</option>
+                ))}
               </select>
               {fieldErrors.asset && <div className="invalid-feedback">{fieldErrors.asset}</div>}
             </div>
@@ -150,13 +190,13 @@ export default function Booking() {
           {/* Slot info */}
           {selectedAsset && (
             <div className="small text-muted mt-1">
-              📅 Booking for: <strong>{selectedAsset.assetTag} — {selectedAsset.name}</strong>
+              📅 Booking for: <strong>{selectedAsset.assetTag}</strong>
               &nbsp;· Rule: no overlapping bookings allowed.
             </div>
           )}
           {!selectedAsset && (
             <div className="small text-muted mt-1">
-              💡 Room B2 booked 9:00–10:00 → 9:30–10:30 rejected, 10:00–11:00 OK.
+              💡 Back-to-back bookings are allowed (10:00–11:00 then 11:00–12:00 OK).
             </div>
           )}
         </form>
@@ -164,24 +204,23 @@ export default function Booking() {
 
       {/* Booking schedule list */}
       <h6 className="fw-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-        Bookings {selectedAsset ? `— ${selectedAsset.name}` : ''}
+        Bookings {selectedAsset ? `— ${selectedAsset.assetTag}` : ''}
       </h6>
       {!selectedAssetId && <p className="text-muted small">Select a resource above to see its bookings.</p>}
       {selectedAssetId && (
         <table className="table table-sm table-bordered table-hover">
           <thead className="table-light">
-            <tr><th>Start</th><th>End</th><th>Booked By</th><th>Status</th><th>Actions</th></tr>
+            <tr><th>Start</th><th>End</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            {bookings.length === 0 && <tr><td colSpan={5} className="text-center text-muted small">No bookings for this resource.</td></tr>}
+            {bookings.length === 0 && <tr><td colSpan={4} className="text-center text-muted small">No bookings for this resource.</td></tr>}
             {bookings.map(b => (
               <tr key={b.id}>
-                <td className="small">{new Date(b.startDatetime || b.startTime || b.start).toLocaleString()}</td>
-                <td className="small">{new Date(b.endDatetime || b.endTime || b.end).toLocaleString()}</td>
-                <td className="small">{b.bookedBy || b.employeeName || b.user?.name || '—'}</td>
+                <td className="small">{new Date(b.startTime).toLocaleString()}</td>
+                <td className="small">{new Date(b.endTime).toLocaleString()}</td>
                 <td><span className={`badge ${STATUS_BADGE[b.status] || 'bg-secondary'}`}>{b.status}</span></td>
                 <td>
-                  {b.status !== 'Cancelled' && b.status !== 'Completed' && (
+                  {b.status !== 'CANCELLED' && b.status !== 'COMPLETED' && (
                     <button className="btn btn-outline-danger btn-sm" onClick={() => handleCancel(b.id)}>Cancel</button>
                   )}
                 </td>

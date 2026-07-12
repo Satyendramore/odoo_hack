@@ -247,6 +247,21 @@ public class MaintenanceService {
     }
 
     /**
+     * Get all maintenance requests.
+     *
+     * @return list of all maintenance requests
+     */
+    @Transactional(readOnly = true)
+    public List<MaintenanceResponse> getAll() {
+        List<MaintenanceRequest> requests = maintenanceRequestRepository.findAll();
+        // Sort by createdAt descending
+        requests.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        return requests.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Maps a MaintenanceRequest entity to its DTO representation.
      *
      * @param maintenance the maintenance request entity

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api.js';
+import { authAPI } from '../api/auth';
 import { useAuth } from '../AuthContext.jsx';
 
 export default function Login() {
@@ -36,10 +36,10 @@ export default function Login() {
     setFieldErrors({});
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await authAPI.login({ email, password });
       const { token, userId, name, email: userEmail, role } = res.data;
       if (!token) { setError('Unexpected server response.'); return; }
-      login(token, { id: userId, name, email: userEmail, role });
+      login(token, { userId, name, email: userEmail, role });
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.status === 401

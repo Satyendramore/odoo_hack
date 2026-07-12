@@ -117,4 +117,17 @@ public class MaintenanceController {
         List<MaintenanceResponse> history = maintenanceService.getHistory(assetId);
         return ResponseEntity.ok(history);
     }
+
+    /**
+     * Get all maintenance requests (paginated or all).
+     * Open to any authenticated user.
+     *
+     * @return list of all maintenance requests
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<MaintenanceResponse>> getAll() {
+        List<MaintenanceResponse> requests = maintenanceService.getAll();
+        return ResponseEntity.ok(requests);
+    }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api.js';
+import apiClient from '../api/client.js';
 
 const TYPE_ICON = {
   allocation: '🔁',
@@ -19,7 +19,7 @@ export default function Notification() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/notifications')
+    apiClient.get('/notifications')
       .then(res => setNotifications(res.data))
       .catch(() => {
         // Fallback placeholder data matching the layout
@@ -45,7 +45,7 @@ export default function Notification() {
 
   async function markRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    try { await api.patch(`/notifications/${id}/read`); } catch { /* non-critical */ }
+    try { await apiClient.patch(`/notifications/${id}/read`); } catch { /* non-critical */ }
   }
 
   return (

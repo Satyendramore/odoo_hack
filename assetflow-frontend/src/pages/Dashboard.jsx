@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api.js';
+import { dashboardAPI } from '../api/dashboard';
 import { useAuth } from '../AuthContext.jsx';
 import { Link } from 'react-router-dom';
 
 const DEFAULT_STATS = {
-  totalAssets: 0,
-  availableAssets: 0,
-  allocatedAssets: 0,
-  pendingMaintenance: 0,
+  assetsAvailable: 0,
+  assetsAllocated: 0,
+  maintenanceInProgress: 0,
+  maintenancePendingApproval: 0,
+  activeBookings: 0,
+  pendingTransferRequests: 0,
+  upcomingReturns: 0,
+  overdueReturns: 0,
 };
 
 function StatCard({ label, value, icon, color, bg, to }) {
@@ -57,11 +61,23 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        const res = await api.get('/dashboard/summary');
+        const res = await dashboardAPI.getSummary();
         setStats({ ...DEFAULT_STATS, ...res.data });
-        setRecentActivity(res.data.recentActivity || []);
-        setAlerts(res.data.alerts || []);
-      } catch {
+        
+        // Generate alerts based on stats
+        const generatedAlerts = [];
+        if (res.data.maintenancePendingApproval > 0) {
+          generatedAlerts.push(`${res.data.maintenancePendingApproval} maintenance request(s) waiting for approval.`);
+        }
+        if (res.data.overdueReturns > 0) {
+          generatedAlerts.push(`${res.data.overdueReturns} asset(s) overdue for return.`);
+        }
+        if (res.data.pendingTransferRequests > 0) {
+          generatedAlerts.push(`${res.data.pendingTransferRequests} transfer request(s) pending.`);
+        }
+        setAlerts(generatedAlerts);
+      } catch (err) {
+        console.error('Failed to fetch dashboard summary:', err);
         setStats(DEFAULT_STATS);
       } finally {
         setLoading(false);
@@ -90,10 +106,14 @@ export default function Dashboard() {
         <>
           {/* Stat cards */}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 28 }}>
-            <StatCard label="Total Assets"         value={stats.totalAssets}        icon="⬡" color="#6366f1" bg="rgba(99,102,241,0.1)"  to="/assets" />
-            <StatCard label="Available"            value={stats.availableAssets}    icon="✓" color="#22c55e" bg="rgba(34,197,94,0.1)"   to="/assets" />
-            <StatCard label="Allocated"            value={stats.allocatedAssets}    icon="⇄" color="#f59e0b" bg="rgba(245,158,11,0.1)"  to="/allocations" />
-            <StatCard label="Pending Maintenance"  value={stats.pendingMaintenance} icon="⚙" color="#ef4444" bg="rgba(239,68,68,0.1)"   to="/maintenance" />
+            <StatCard label="Available"              value={stats.assetsAvailable}              icon="✓" color="#22c55e" bg="rgba(34,197,94,0.1)"   to="/assets" />
+            <StatCard label="Allocated"              value={stats.assetsAllocated}              icon="⇄" color="#f59e0b" bg="rgba(245,158,11,0.1)"  to="/allocations" />
+            <StatCard label="Maintenance In Progress" value={stats.maintenanceInProgress}       icon="⚙" color="#ef4444" bg="rgba(239,68,68,0.1)"   to="/maintenance" />
+            <StatCard label="Pending Approval"       value={stats.maintenancePendingApproval}   icon="⏳" color="#8b5cf6" bg="rgba(139,92,246,0.1)"  to="/maintenance" />
+            <StatCard label="Active Bookings"        value={stats.activeBookings}               icon="⊡" color="#06b6d4" bg="rgba(6,182,212,0.1)"   to="/bookings" />
+            <StatCard label="Transfer Requests"      value={stats.pendingTransferRequests}      icon="✉" color="#ec4899" bg="rgba(236,72,153,0.1)"  to="/allocations" />
+            <StatCard label="Upcoming Returns"       value={stats.upcomingReturns}              icon="📦" color="#14b8a6" bg="rgba(20,184,166,0.1)"  to="/allocations" />
+            <StatCard label="Overdue Returns"        value={stats.overdueReturns}               icon="⚠" color="#f97316" bg="rgba(249,115,22,0.1)"  to="/allocations" />
           </div>
 
           {/* Alerts */}
@@ -123,11 +143,11 @@ export default function Dashboard() {
               Recent Activity
             </div>
             <div className="af-card" style={{ padding: 0, overflow: 'hidden' }}>
-              {(recentActivity.length > 0 ? recentActivity : MOCK_ACTIVITY).map((item, i) => (
+              {MOCK_ACTIVITY.map((item, i) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '13px 18px',
-                  borderBottom: i < (recentActivity.length > 0 ? recentActivity : MOCK_ACTIVITY).length - 1 ? '1px solid var(--border-color)' : 'none',
+                  borderBottom: i < MOCK_ACTIVITY.length - 1 ? '1px solid var(--border-color)' : 'none',
                 }}>
                   <div style={{
                     width: 34, height: 34, borderRadius: '50%',
