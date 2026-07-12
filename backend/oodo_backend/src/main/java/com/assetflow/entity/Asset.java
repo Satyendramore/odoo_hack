@@ -43,10 +43,10 @@ public class Asset {
     @Column(name = "acquisition_cost", precision = 19, scale = 2)
     private BigDecimal acquisitionCost;
 
-    @Column(length = 255)
+    @Column(name = "`condition`", length = 255)
     private String condition;
 
-    @Column(nullable = false, length = 500)
+    @Column(name = "`location`", nullable = false, length = 255)
     private String location;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -54,7 +54,7 @@ public class Asset {
     private Department department;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(name = "`status`", nullable = false, length = 50)
     private AssetStatus status;
 
     @Column(nullable = false)

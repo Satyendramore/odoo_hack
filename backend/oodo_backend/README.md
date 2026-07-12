@@ -1,141 +1,189 @@
-# AssetFlow - Enterprise Asset & Resource Management System
+# AssetFlow Backend
 
-A Spring Boot 3.3 (Java 17) application for managing enterprise assets and resources with JWT-based authentication and role-based access control.
+A Spring Boot 3.3 asset management system with allocation, booking, and maintenance workflows.
 
-## Project Setup
+## Features
 
-### Prerequisites
+- **Asset Lifecycle Management**: Register, track, and maintain assets with auto-generated tags (AF-0001, AF-0002, etc.)
+- **Allocation & Transfer Workflow**: Safely allocate assets to users with conflict detection and transfer request workflow
+- **Resource Booking**: Time-slot based booking with overlap detection (allows back-to-back bookings)
+- **Maintenance Workflow**: Request, approve, and track asset maintenance with asset status integration
+- **Dashboard KPI**: Real-time metrics across all modules
+- **Role-Based Access Control**: ADMIN, ASSET_MANAGER, DEPARTMENT_HEAD, EMPLOYEE roles
+- **Concurrency Safety**: Pessimistic database locking prevents race conditions
 
-- **Java 17** or later
-- **Maven 3.8+**
-- **PostgreSQL 16**
-- **Docker** (optional, for PostgreSQL via docker-compose)
+## Tech Stack
 
-### Tech Stack
+- **Framework**: Spring Boot 3.3
+- **Language**: Java 17+
+- **Database**: MySQL 8.0+
+- **ORM**: Hibernate/JPA
+- **Security**: Spring Security with JWT
+- **Build**: Maven
 
-- **Spring Boot 3.3.0**
-- **Spring Data JPA** with Hibernate
-- **Spring Security 6** with JWT (JJWT 0.12.5)
-- **PostgreSQL 16**
-- **Lombok**
-- **Maven**
+## Prerequisites
+
+- Java 17+
+- Maven 3.6+
+- MySQL 8.0+ (or Docker with Docker Compose)
+- Git
 
 ## Quick Start
 
-### 1. Start PostgreSQL Database
+### 1. Database Setup
 
-Using Docker Compose:
+Start MySQL with Docker Compose:
 
 ```bash
 docker-compose up -d
 ```
 
-Or if you have PostgreSQL installed locally:
+Or use an existing MySQL instance and update `application.properties`:
 
-```bash
-# Create database
-createdb assetflow
-
-# Create user
-psql -U postgres -c "CREATE USER assetflow WITH PASSWORD 'assetflow';"
-psql -U postgres -c "ALTER USER assetflow CREATEDB;"
-psql -U assetflow -d assetflow -c "GRANT ALL PRIVILEGES ON DATABASE assetflow TO assetflow;"
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/odoobackend
+spring.datasource.username=root
+spring.datasource.password=YOUR_PASSWORD
 ```
 
-### 2. Build the Project
+### 2. Build & Run
 
 ```bash
 mvn clean install
-```
-
-### 3. Run the Application
-
-```bash
 mvn spring-boot:run
 ```
 
-The application will start on `http://localhost:8080/api`
+The API will be available at `http://localhost:8080`
 
-### 4. Run Tests
+### 3. Authentication
+
+All endpoints except `/auth/signup` and `/auth/login` require authentication.
+
+First, sign up:
 
 ```bash
-mvn test
+curl -X POST http://localhost:8080/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john",
+    "email": "john@example.com",
+    "password": "password123"
+  }'
 ```
 
-## Configuration
+Then login:
 
-Edit `src/main/resources/application.yml` to configure:
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/assetflow
-    username: assetflow
-    password: assetflow
-
-jwt:
-  secret: your-secret-key-change-this-in-production
-  expiration-ms: 86400000  # 24 hours
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john",
+    "password": "password123"
+  }'
 ```
 
-**Important**: Change the JWT secret in production to a secure random string (minimum 32 characters).
+Use the returned JWT token for subsequent requests:
+
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:8080/assets
+```
 
 ## API Endpoints
 
-### Authentication
+### Assets
+- `POST /assets` - Create asset
+- `GET /assets` - List assets (with filters)
+- `GET /assets/{id}` - Get asset details
+- `PATCH /assets/{id}/status` - Update asset status
 
-#### Sign Up
-```http
-POST /api/auth/signup
-Content-Type: application/json
+### Allocations
+- `POST /allocations` - Allocate asset (conflict detection)
+- `POST /allocations/{id}/return` - Return asset
+- `GET /allocations/{id}` - Get allocation
+- `GET /allocations/asset/{id}/history` - Get allocation history
+- `GET /allocations/overdue` - Get overdue allocations
 
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "securePassword123"
-}
-```
+### Transfer Requests
+- `POST /transfer-requests` - Create transfer request
+- `PATCH /transfer-requests/{id}/approve` - Approve transfer
+- `PATCH /transfer-requests/{id}/reject` - Reject transfer
+- `GET /transfer-requests` - List requests
+- `GET /transfer-requests/{id}` - Get request details
 
-Response: `201 Created`
+### Bookings
+- `POST /bookings` - Create booking (overlap detection)
+- `GET /bookings/asset/{assetId}` - Get calendar (all bookings for asset)
+- `GET /bookings/{id}` - Get booking
+- `GET /bookings/my/upcoming` - Get my upcoming bookings
+- `PATCH /bookings/{id}/cancel` - Cancel booking
+- `PATCH /bookings/{id}/reschedule` - Reschedule booking
+
+### Maintenance
+- `POST /maintenance` - Raise maintenance request
+- `PATCH /maintenance/{id}/approve` - Approve request
+- `PATCH /maintenance/{id}/reject` - Reject request
+- `PATCH /maintenance/{id}/resolve` - Resolve maintenance
+- `GET /maintenance/asset/{assetId}` - Get maintenance history
+
+### Dashboard
+- `GET /dashboard/summary` - Get KPI metrics
+
+## Architecture
+
+### Concurrency Safety
+
+**Pessimistic Write Locking** prevents race conditions:
+- Allocation: Only one allocation per asset allowed
+- Booking: Only one booking per time slot allowed
+
+**Atomic Transactions** ensure consistency:
+- Transfer workflow: Cancel old + create new (atomic)
+- Booking reschedule: Cancel + create new (atomic)
+- Maintenance resolve: Mark resolved + update asset (atomic)
+
+### State Machines
+
+Each module uses a defined state machine to prevent invalid transitions:
+- **Asset**: AVAILABLE ↔ ALLOCATED, UNDER_MAINTENANCE, RESERVED, LOST, RETIRED, DISPOSED
+- **Allocation**: ACTIVE → RETURNED
+- **Booking**: UPCOMING → ONGOING, COMPLETED, CANCELLED
+- **Maintenance**: PENDING → APPROVED/REJECTED → IN_PROGRESS → RESOLVED
+
+### Schema
+
+Hibernate/JPA manages the schema via `@Entity` classes. Schema is auto-generated on startup (`spring.jpa.hibernate.ddl-auto=update`).
+
+## Authorization
+
+- **ADMIN**: Full access to all operations
+- **ASSET_MANAGER**: Approve/reject allocations and maintenance, manage transfers
+- **DEPARTMENT_HEAD**: Limited to their department's assets
+- **EMPLOYEE**: Can book resources, report maintenance issues
+
+Authorization is enforced at two levels:
+1. **Controller**: `@PreAuthorize` annotations on endpoints
+2. **Service**: Role and ownership checks inside business logic
+
+## Error Handling
+
+Standard HTTP status codes:
+- `200 OK` - Successful operation
+- `201 Created` - Resource created
+- `400 Bad Request` - Validation or state error
+- `401 Unauthorized` - Authentication required
+- `404 Not Found` - Resource not found
+- `409 Conflict` - Concurrent conflict (allocation/booking)
+
+Error responses include structured data:
+
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "role": "EMPLOYEE"
+  "timestamp": "2025-07-12T14:30:00",
+  "status": 409,
+  "message": "Asset is currently held by John Smith",
+  "currentHolder": "John Smith",
+  "suggestedAction": "TRANSFER_REQUEST"
 }
-```
-
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "john@example.com",
-  "password": "securePassword123"
-}
-```
-
-Response: `200 OK`
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "role": "EMPLOYEE"
-}
-```
-
-### Using the JWT Token
-
-Include the token in the Authorization header for protected endpoints:
-
-```http
-GET /api/some-protected-endpoint
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ```
 
 ## Project Structure
@@ -143,208 +191,82 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ```
 src/main/java/com/assetflow/
 ├── entity/              # JPA entities
-│   ├── User.java       # User entity (implements UserDetails)
-│   └── Department.java # Department entity
-├── enums/              # Enumerations
-│   ├── Role.java       # User roles: ADMIN, ASSET_MANAGER, DEPARTMENT_HEAD, EMPLOYEE
-│   └── Status.java     # Status: ACTIVE, INACTIVE
-├── repository/         # Spring Data JPA repositories
-│   ├── UserRepository.java
-│   └── DepartmentRepository.java
-├── dto/                # Data Transfer Objects
-│   ├── SignupRequest.java
-│   ├── LoginRequest.java
-│   ├── AuthResponse.java
-│   └── ErrorResponse.java
-├── service/            # Business logic
-│   └── AuthService.java
-├── controller/         # REST controllers
-│   └── AuthController.java
-├── security/           # Security configuration & JWT handling
-│   ├── JwtUtil.java
-│   ├── JwtAuthFilter.java
-│   └── UserDetailsServiceImpl.java
-├── exception/          # Custom exceptions & global handler
-│   ├── EmailAlreadyExistsException.java
-│   ├── InvalidCredentialsException.java
-│   └── GlobalExceptionHandler.java
-├── config/             # Spring configuration
-│   └── SecurityConfig.java
-└── AssetFlowApplication.java
+├── dto/                 # Request/response DTOs
+├── service/             # Business logic
+├── controller/          # REST endpoints
+├── repository/          # JPA repositories
+├── exception/           # Custom exceptions
+├── enums/               # Enums (Status, Role, etc.)
+└── config/              # Spring configuration
 ```
 
-## Key Features
+## Development
 
-### Setup + Auth Module
+### Logging
 
-- **User Registration**: Create new accounts with email validation
-- **User Login**: Authenticate with email and password
-- **JWT Authentication**: Stateless token-based authentication
-- **Role-Based Access Control**: Four user roles (ADMIN, ASSET_MANAGER, DEPARTMENT_HEAD, EMPLOYEE)
-- **Password Security**: BCrypt hashing with strength 12
-- **Validation**: Input validation with detailed error messages
-- **Exception Handling**: Comprehensive global exception handler
+Comprehensive logging at INFO level:
 
-### Security Features
-
-- Stateless session policy
-- CSRF protection disabled for API (stateless)
-- BCryptPasswordEncoder with strength 12
-- JWT tokens with 24-hour expiration
-- Automatic role assignment on signup (always EMPLOYEE)
-- Only authorized admins can promote users to higher roles
-
-## User Roles
-
-| Role | Description |
-|------|-------------|
-| **ADMIN** | System administrator with full access |
-| **ASSET_MANAGER** | Manages company assets and inventory |
-| **DEPARTMENT_HEAD** | Manages department-specific resources |
-| **EMPLOYEE** | Regular employee (default on signup) |
-
-## Error Handling
-
-The API returns standardized error responses:
-
-### Validation Error (400)
-```json
-{
-  "timestamp": "2026-07-12T09:00:00",
-  "status": 400,
-  "message": "Validation failed",
-  "errors": {
-    "email": "Email should be valid",
-    "password": "Password should be at least 8 characters"
-  }
-}
+```bash
+tail -f target/application.log
 ```
 
-### Email Already Exists (409)
-```json
-{
-  "timestamp": "2026-07-12T09:00:00",
-  "status": 409,
-  "message": "Email already registered: john@example.com"
-}
-```
+### Testing
 
-### Invalid Credentials (401)
-```json
-{
-  "timestamp": "2026-07-12T09:00:00",
-  "status": 401,
-  "message": "Invalid email or password"
-}
-```
+Run tests with:
 
-## Database Schema
-
-### Users Table
-- `id` (UUID, Primary Key)
-- `name` (String, not null)
-- `email` (String, unique, not null)
-- `password` (String, hashed, not null)
-- `role` (Enum: ADMIN, ASSET_MANAGER, DEPARTMENT_HEAD, EMPLOYEE, not null)
-- `department_id` (UUID, Foreign Key to Departments, nullable)
-- `status` (Enum: ACTIVE, INACTIVE, not null)
-- `created_at` (Timestamp, auto-generated)
-- `updated_at` (Timestamp, auto-updated)
-
-### Departments Table
-- `id` (UUID, Primary Key)
-- `name` (String, not null)
-- `head_id` (UUID, Foreign Key to Users, nullable)
-- `parent_department_id` (UUID, Self-referencing Foreign Key, nullable)
-- `status` (Enum: ACTIVE, INACTIVE, not null)
-- `created_at` (Timestamp, auto-generated)
-- `updated_at` (Timestamp, auto-updated)
-
-## Testing
-
-Tests use an in-memory H2 database configured in `application-test.yml`.
-
-Run all tests:
 ```bash
 mvn test
 ```
 
-Run a specific test class:
-```bash
-mvn test -Dtest=AssetFlowApplicationTests
-```
+### Building for Production
 
-## Build & Deployment
+Create a production JAR:
 
-### Build JAR
 ```bash
 mvn clean package -DskipTests
+java -jar target/assetflow-*.jar
 ```
 
-### Run JAR
-```bash
-java -jar target/assetflow-1.0.0.jar
-```
+## Docker
 
-### Run with Custom Properties
-```bash
-java -jar target/assetflow-1.0.0.jar \
-  --spring.datasource.url=jdbc:postgresql://prod-db:5432/assetflow \
-  --spring.datasource.username=assetflow \
-  --spring.datasource.password=prod-password \
-  --jwt.secret=your-production-secret-key
-```
-
-## Environment Variables
-
-For production, use environment variables instead of hardcoding values:
+Build and run in Docker:
 
 ```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://prod-db:5432/assetflow
-export SPRING_DATASOURCE_USERNAME=assetflow
-export SPRING_DATASOURCE_PASSWORD=prod-password
-export JWT_SECRET=your-production-secret-key
-export JWT_EXPIRATION_MS=86400000
+docker build -t assetflow .
+docker run -p 8080:8080 assetflow
 ```
 
-## Development Notes
+## Database Schema
 
-### Adding New Endpoints
+Auto-generated on startup from `@Entity` classes:
 
-1. Create a DTO in `com.assetflow.dto`
-2. Implement business logic in a Service class (`com.assetflow.service`)
-3. Create a Controller method (`com.assetflow.controller`)
-4. Add appropriate validation and exception handling
-5. Update routes in SecurityConfig if needed
+- `users` - User accounts
+- `assets` - Asset inventory
+- `allocations` - Asset ownership tracking
+- `transfer_requests` - Transfer workflow
+- `bookings` - Time-slot bookings
+- `maintenance_requests` - Maintenance requests
 
-### Database Migrations
+## Troubleshooting
 
-Using Hibernate with `ddl-auto: update` for development. For production, consider using Flyway or Liquibase for versioned migrations.
+### Application won't start
 
-### Logging
+1. Check MySQL is running: `docker-compose ps`
+2. Verify database credentials in `application.properties`
+3. Check logs for exceptions
 
-Configure logging in `application.yml`:
+### 409 Conflict on allocation
 
-```yaml
-logging:
-  level:
-    root: INFO
-    com.assetflow: DEBUG
-```
+This is expected behavior - it means the asset is already allocated to another user. Create a transfer request instead.
 
-## Future Modules
+### 409 Conflict on booking
 
-- Asset Management (CRUD operations)
-- Department Management
-- Resource Allocation
-- Audit Logging
-- Notification System
-- Advanced Reporting
-
-## License
-
-This project is part of the AssetFlow Enterprise Management System.
+The requested time slot overlaps with an existing booking. The response includes the conflicting times.
 
 ## Support
 
-For issues or questions, contact the development team.
+For issues or questions, review the source code in `src/main/java/com/assetflow/` or check the service layer documentation in the code.
+
+## License
+
+Internal use only.

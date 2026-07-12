@@ -21,11 +21,14 @@ public class AssetTagGenerator {
      */
     @Transactional
     public String generateAssetTag() {
-        Long sequenceValue = (Long) entityManager
-                .createNativeQuery("SELECT nextval('asset_tag_seq')")
+        // Use database-agnostic approach: count existing assets + 1
+        Object result = entityManager
+                .createNativeQuery("SELECT COALESCE(MAX(CAST(SUBSTRING(asset_tag, 4) AS UNSIGNED)), 0) + 1 FROM assets")
                 .getSingleResult();
+        
+        Long nextValue = ((Number) result).longValue();
 
-        String tag = formatAssetTag(sequenceValue);
+        String tag = formatAssetTag(nextValue);
         log.debug("Generated asset tag: {}", tag);
         return tag;
     }

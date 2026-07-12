@@ -26,4 +26,13 @@ public interface TransferRequestRepository extends JpaRepository<TransferRequest
      * @return list of transfer requests for that allocation
      */
     List<TransferRequest> findByAllocationId(UUID allocationId);
+
+    /**
+     * Count transfer requests with given status.
+     * Used for dashboard KPI metrics.
+     *
+     * @param status the transfer request status
+     * @return count of transfer requests with this status
+     */
+    long countByStatus(TransferRequestStatus status);
 }

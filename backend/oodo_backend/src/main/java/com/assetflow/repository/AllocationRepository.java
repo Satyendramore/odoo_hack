@@ -55,4 +55,13 @@ public interface AllocationRepository extends JpaRepository<Allocation, UUID> {
      * @return list of all active allocations
      */
     List<Allocation> findByStatus(AllocationStatus status);
+
+    /**
+     * Count allocations with given status.
+     * Used for dashboard KPI metrics.
+     *
+     * @param status the allocation status
+     * @return count of allocations with this status
+     */
+    long countByStatus(AllocationStatus status);
 }

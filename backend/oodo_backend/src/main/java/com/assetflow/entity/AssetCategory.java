@@ -26,7 +26,7 @@ public class AssetCategory {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "JSON")
     @Convert(converter = JsonMapConverter.class)
     private Map<String, Object> customFields;
 

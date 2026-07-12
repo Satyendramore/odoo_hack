@@ -70,4 +70,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
      * @return list of bookings matching criteria
      */
     List<Booking> findByStatusAndEndTimeBefore(BookingStatus status, Instant time);
+
+    /**
+     * Count bookings with given status.
+     * Used for dashboard KPI metrics.
+     *
+     * @param status the booking status
+     * @return count of bookings with this status
+     */
+    long countByStatus(BookingStatus status);
 }
